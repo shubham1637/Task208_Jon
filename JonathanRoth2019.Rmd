@@ -1,0 +1,102 @@
+---
+title: "JonathanRoth2019"
+author: "Shubham Gupta"
+date: "January 14, 2019"
+output:
+  html_document:
+    toc: true
+    toc_float:
+      collapsed: true
+      smooth_scroll: false
+    number_sections: true #Number all headers
+    theme: sandstone
+    # highlight: espresso #Highlights chunk and results
+    code_folding: hide
+---
+
+```{r setup, include=FALSE}
+
+```
+
+```{r Clean_Environment, echo=FALSE}
+rm(list = ls())
+tropical=  c('darkorange', 'dodgerblue', 'hotpink', 'limegreen', 'grey', "skyblue",  'yellowgreen', 'red', 'yellow')
+palette(tropical)
+par(pch = 19)
+```
+
+<br>
+
+```{r load_hidden, echo=FALSE, results="hide", warning=FALSE}
+suppressPackageStartupMessages({
+})
+```
+
+## Load libraries
+```{r loadLibs, echo=TRUE}
+
+```
+
+<br>
+
+# Load Data
+```{r loadData}
+setwd("~/RostLab/2019/Jon/Task208_Jon")
+F20180906_FL_Med24_N2a_FLAG_BR12 <- read.table("53538_29539_20180906_FL_Med24_N2a_FLAG_BR12_MID_SWATH_MSPLITfiltered.txt", header = TRUE, sep = "\t", comment.char = "")
+F20170623_Kdm1a_N2aSC15_FLAG_BR1 <- read.table("55215_26707_20170623_Kdm1a_N2aSC15_FLAG_BR1_SWATH_MSPLITfiltered.txt", header = TRUE, sep = "\t", comment.char = "")
+
+```
+
+
+```{r}
+dim(F20180906_FL_Med24_N2a_FLAG_BR12)
+F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge <- paste0(F20180906_FL_Med24_N2a_FLAG_BR12$Peptide,  "/", F20180906_FL_Med24_N2a_FLAG_BR12$z.1)
+
+length(unique(F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge)) # 8338
+length(unique(F20180906_FL_Med24_N2a_FLAG_BR12$stat2)) # 8251 #stat2 is retention time.
+df0 <- F20180906_FL_Med24_N2a_FLAG_BR12[!duplicated(F20180906_FL_Med24_N2a_FLAG_BR12[,c(18,36)]),] # Few peptides have multiple retention time values. Let's have a look at them
+rownames(df0) <- NULL
+length(df0$Peptide[duplicated(df0$Peptide)]) # 870
+df0[df0$Peptide == "TDQAQKAEGAGDAK",c(2:5,18,36)] # Something is wrong as their mz values are different. Does not make sense.
+dup.Pep <- df0$Peptide[duplicated(df0$Peptide)]
+sum(sapply(dup.Pep, function(peptide) length(unique(df0$Mz[df0$Peptide == peptide])) == 1)) # This is the case for all 870 peptides.
+```
+
+
+```{r}
+# Remove all those duplicated pairs and move ahead.
+dup.Pep <- df0$Peptide[duplicated(df0$Peptide)]
+df1 <- df0[!(df0$Peptide %in% dup.Pep), ]
+dim(df1) # 6621
+
+pf0 <- F20170623_Kdm1a_N2aSC15_FLAG_BR1[!duplicated(F20170623_Kdm1a_N2aSC15_FLAG_BR1[,c(5,18)]),]
+rownames(pf0) <- NULL
+pf1 <- pf0[!(pf0$Peptide %in% pf0$Peptide[duplicated(pf0$Peptide)]), ]
+dim(pf1) # 4026
+```
+
+```{r}
+cmnPep <- intersect(df1$Peptide, pf1$Peptide) #2329 peptides
+pepSet <- union(df1$Peptide, pf1$Peptide) # 8318 peptides
+RT.table <- merge(df1[,c(5,18)], pf1[,c(5,18)], by = "Peptide", all = TRUE)
+colnames(RT.table) <- c("Peptide", "df1", "pf1")
+cor(RT.table$df1, RT.table$pf1, use="complete.obs")
+plot(RT.table$df1, RT.table$pf1, pch = 16, cex = 0.5); abline(0,1, col = "red")
+```
+
+
+```{r}
+
+```
+
+
+
+# Session Info
+```{r sessionInfo, eval=TRUE}
+devtools::session_info()
+```
+
+<br>
+
+## Last compilation
+Last compiled at `r Sys.Date()`.
