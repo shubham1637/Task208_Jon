@@ -43,9 +43,17 @@ suppressPackageStartupMessages({
 ```{r loadData}
 setwd("~/RostLab/2019/Jon/Task208_Jon")
 temp <- list.files(pattern = "*SWATH_MSPLITfiltered.txt")
-F20180906_FL_Med24_N2a_FLAG_BR12 <- read.table("53538_29539_20180906_FL_Med24_N2a_FLAG_BR12_MID_SWATH_MSPLITfiltered.txt", header = TRUE, sep = "\t", comment.char = "")
-F20170623_Kdm1a_N2aSC15_FLAG_BR1 <- read.table("55215_26707_20170623_Kdm1a_N2aSC15_FLAG_BR1_SWATH_MSPLITfiltered.txt", header = TRUE, sep = "\t", comment.char = "")
-
+MSPLITfiltered <- list()
+for(i in 1:length(temp)){
+  MSPLITfiltered[[i]] <- read.table(temp[i], header = TRUE, sep = "\t", comment.char = "")
+  MSPLITfiltered[[i]][, "stat18"] <- as.numeric(strsplit(as.character(MSPLITfiltered[[i]][, "stat18"]), split='fdr', fixed=TRUE)) #Loss of some precision because there are 19 digits after decimal in character format.
+  MSPLITfiltered[[i]][, "Peptide_charge"] <- paste0(MSPLITfiltered[[i]][, "Peptide"],  "/", MSPLITfiltered[[i]][, "z.1"])
+  MSPLITfiltered[[i]] <- MSPLITfiltered[[i]][, -c(1,9, 16, 19:33)]
+}
+pattern <- "(\\d{5}_)(\\d{5}_)(\\d{8}_)(.*?)(_SWATH_MSPLITfiltered\\.txt$)"
+temp <- sapply(temp, function(x) gsub(pattern, replacement = paste0("F", "\\3\\4"), x))
+names(MSPLITfiltered) <- temp
+names(temp) <- NULL
 ```
 
 NA.idx.F20180906_FL_Med24_N2a_FLAG_BR12_DDA
@@ -54,67 +62,80 @@ NA.idx.F20180906_FL_Med24_N2a_FLAG_BR12_DDA
 29307_20180624_FL_Chtop_138nt_N2ax2_FLAG_BR3_RE_1_SWATH.mzML
 
 The stat1 column is the SWATH RT value for the spectral match and the stat2 column is the RT value for the DDA library match, and that the final column is the FDR. 
-stat18 seems to be pvalues for the peaks identified by sectral match. Their retention time is in stat1 column. The stat19 seems to be FDR corrected qvalues from stat18 column. 
-```{r}
-dim(F20180906_FL_Med24_N2a_FLAG_BR12)
-F20180906_FL_Med24_N2a_FLAG_BR12$stat18 <- as.numeric(strsplit(as.character(F20180906_FL_Med24_N2a_FLAG_BR12$stat18), split='fdr', fixed=TRUE)) #Loss of some precision because there are 19 digits after decimal in character format.
-F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge <- paste0(F20180906_FL_Med24_N2a_FLAG_BR12$Peptide,  "/", F20180906_FL_Med24_N2a_FLAG_BR12$z.1)
-F20180906_FL_Med24_N2a_FLAG_BR12 <- F20180906_FL_Med24_N2a_FLAG_BR12[, -c(1,9, 16, 19:33)]
-head(F20180906_FL_Med24_N2a_FLAG_BR12)
-
-length(unique(F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge)) # 8338
-length(unique(F20180906_FL_Med24_N2a_FLAG_BR12$stat2)) # 8251 #stat2 is retention time.
-F20180906_FL_Med24_N2a_FLAG_BR12_DDA <- F20180906_FL_Med24_N2a_FLAG_BR12[!duplicated(F20180906_FL_Med24_N2a_FLAG_BR12[,c(15,18)]), c(15,18)] # Few peptides have multiple retention time values. Let's have a look at them
-rownames(F20180906_FL_Med24_N2a_FLAG_BR12_DDA) <- NULL
-```
-
-
-```{r}
-F20170623_Kdm1a_N2aSC15_FLAG_BR1$Peptide_charge <- paste0(F20170623_Kdm1a_N2aSC15_FLAG_BR1$Peptide,  "/", F20170623_Kdm1a_N2aSC15_FLAG_BR1$z.1)
-F20170623_Kdm1a_N2aSC15_FLAG_BR1 <- F20170623_Kdm1a_N2aSC15_FLAG_BR1[, -c(1,9, 16, 19:33)]
-
-length(unique(F20170623_Kdm1a_N2aSC15_FLAG_BR1$Peptide_charge)) # 4802
-length(unique(F20170623_Kdm1a_N2aSC15_FLAG_BR1$stat2)) # 4771
-F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA <- F20170623_Kdm1a_N2aSC15_FLAG_BR1[!duplicated(F20170623_Kdm1a_N2aSC15_FLAG_BR1[,c(15,18)]),c(15,18)]
-rownames(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA) <- NULL
-nrow(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA) # 4802
-```
-
-```{r}
-cmnPep <- intersect(F20180906_FL_Med24_N2a_FLAG_BR12_DDA$Peptide_charge, F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA$Peptide_charge) #3129 peptides
-pepSet <- union(F20180906_FL_Med24_N2a_FLAG_BR12_DDA$Peptide_charge, F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA$Peptide_charge) #10011 peptides
-RT.table <- merge(F20180906_FL_Med24_N2a_FLAG_BR12_DDA[,c(2,1)], F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA[,c(2,1)], by = "Peptide_charge", all = TRUE) #10011 peptides
-colnames(RT.table) <- c("Peptide_charge", "F20180906_FL_Med24_N2a_FLAG_BR12_DDA", "F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA")
-cor(RT.table$F20180906_FL_Med24_N2a_FLAG_BR12, RT.table$F20180906_FL_Med24_N2a_FLAG_BR12_DDA, use="complete.obs")
-plot(RT.table$F20180906_FL_Med24_N2a_FLAG_BR12, RT.table$F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA, pch = 16, cex = 0.5); abline(0,1, col = "red")
-```
-
-Above plot shows RTs from DDA libraries of two runs. It seems to be correlated pretty well which is a good thing. However, there are some points as outliers. stat1 is RT identified by spectral match. Let's check if we can use those values to identify correct RT for outliers.
-
-```{r}
-RT.table$Peptide_charge[RT.table$F20170623_Kdm1a_N2aSC15_FLAG_BR1/RT.table$F20180906_FL_Med24_N2a_FLAG_BR12 > 1.1 & !is.na(RT.table$F20170623_Kdm1a_N2aSC15_FLAG_BR1/RT.table$F20180906_FL_Med24_N2a_FLAG_BR12)]
-
-F20180906_FL_Med24_N2a_FLAG_BR12[F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge == "KYEM+15.995FAQTLQQSR/2",c("stat1", "stat2", "stat18", "stat19")]
-F20170623_Kdm1a_N2aSC15_FLAG_BR1[F20170623_Kdm1a_N2aSC15_FLAG_BR1$Peptide_charge == "KYEM+15.995FAQTLQQSR/2",c("stat1", "stat2", "stat18", "stat19")]
-# For F20170623_Kdm1a_N2aSC15_FLAG_BR1 stat1 and stat2 values are very different. Need to know how stat1 is calculated. Does it uses stat2 and then find peaks within a window? or does it use all peaks from 2-hr run?
-# Without further information, we cannot use stat1.
-
-
-as.character(F20180906_FL_Med24_N2a_FLAG_BR12[F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge == "KYEM+15.995FAQTLQQSR/2","stat19"])
-as.character(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA[F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA$Peptide_charge == "KYEM+15.995FAQTLQQSR/2","stat19"])
-as.character(F20180906_FL_Med24_N2a_FLAG_BR12_DDA[F20180906_FL_Med24_N2a_FLAG_BR12_DDA$Peptide_charge == "SYELQESNVR/2","stat18"])
-as.character(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA[F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA$Peptide_charge == "SYELQESNVR/2","stat18"])
-# This does not help. Need to discuss if we want to kee these points or just take the function to map RT values. 
-```
+stat18 seems to be pvalues for the peaks identified by sectral match. Their retention time is in stat1 column. The stat19 seems to be FDR corrected qvalues from stat18 column.    
 Do not use deaminated peptides. They should not be there as they are removed before as with mSPLIT they did not work.
-
-Correct for missing Values using LOESS function.
 ```{r}
-NA.idx.F20180906_FL_Med24_N2a_FLAG_BR12_DDA <- is.na(RT.table$F20180906_FL_Med24_N2a_FLAG_BR12_DDA)
-NA.idx.F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA <- is.na(RT.table$F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA)
-Loess.fit <- loess(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA~F20180906_FL_Med24_N2a_FLAG_BR12_DDA, data = RT.table, span = 0.1, na.action = na.exclude) # na.action = na.omit
-y <- predict(Loess.fit, newdata=RT.table$F20180906_FL_Med24_N2a_FLAG_BR12_DDA)
-plot(RT.table$F20180906_FL_Med24_N2a_FLAG_BR12_DDA, y, pch = 16, cex = 0.5); abline(0,1, col = "red", na.action = na.exclude)
+MSPLITfiltered_DDA <- list()
+for(i in 1:length(MSPLITfiltered)){
+  MSPLITfiltered_DDA[[i]] <- MSPLITfiltered[[i]][!duplicated(MSPLITfiltered[[i]][,c(15,18)]), c(15,18)]
+  rownames(MSPLITfiltered_DDA[[i]]) <- NULL
+}
+names(MSPLITfiltered_DDA) <- temp
+```
+
+
+```{r}
+cmnPep <- Reduce(intersect, lapply(MSPLITfiltered_DDA, `[[`, 2))
+pepSet <- Reduce(union, lapply(MSPLITfiltered_DDA, `[[`, 2))
+length(cmnPep)
+length(pepSet)
+
+RT.table <- Reduce(function(d1, d2) merge(d1, d2, by = "Peptide_charge", all = TRUE), MSPLITfiltered_DDA)
+colnames(RT.table)[2:ncol(RT.table)] <- temp
+res <- cor(RT.table[,2:ncol(RT.table)], use="complete.obs")
+library(corrplot)
+
+library(knitr)
+kable(res)
+kable(res^2)
+corrplot(res*100, tl.pos="n", cl.lim = c(99.1,100), is.corr = FALSE)
+```
+
+
+
+Below plots shows RTs from DDA libraries of two runs. It seems to be correlated pretty well which is a good thing. However, there are some points as outliers. stat1 is RT identified by spectral match. Let's check if we can use those values to identify correct RT for outliers.
+
+```{r}
+
+plot(RT.table[,2], RT.table[,3], pch = 16, cex = 0.5); abline(0,1, col = "red")
+plot(RT.table[,8], RT.table[,9], pch = 16, cex = 0.5); abline(0,1, col = "red")
+plot(RT.table[,12], RT.table[,13], pch = 16, cex = 0.5); abline(0,1, col = "red")
+plot(RT.table[,9], RT.table[,13], pch = 16, cex = 0.5); abline(0,1, col = "red")
+
+k <- sapply(1:nrow(RT.table), function(i) diff(range(RT.table[i, 2:ncol(RT.table)], na.rm = TRUE)))
+sum(k>3) # 130 peptides have large deviation in DDA library retention time.
+deviPep <- RT.table[which(k >3),1]
+indices <- 1:nrow(RT.table)
+indices <- setdiff(indices, which(k >3))
+
+RT.table[which.max(k),1] # "TGPNNSNTTFQK/2" has RT-error of 2142.133 second/ 35.7 minutes.
+RT.table.deviPep <- RT.table[RT.table$Peptide_charge %in% deviPep,]
+write.table(RT.table.deviPep, "RT.table.deipep.csv", sep = ",", row.names = FALSE)
+```
+
+Even through MSPLIT-DIA is designed to operate without prior knowledge of retention-time (RT) for library peptides, it can utilize RT information to improve sensitivity when it is available in the spectral library (See Supplementary Figure 9). MSPLIT-DIA can optionally conduct a two-pass search. The first-pass search is as described in the previous section in which MSPLIT-DIA scans the whole RT range for possible matches. Then, using the list of peptides identified at 1% FDR, MSPLIT-DIA builds a linear regression model between the library RT and the RT at which the peptides are detected in the DIA data using the least-squares approach, thus automatically correcting for possible systematic RT differences. MSPLIT-DIA then uses the identified peptides to automatically learn the distribution of RT differences between library and DIA peptides and thus determines a RT tolerance window that includes at least 95% of peptides identified in the first pass. In the second-pass search, only matches with library and DIA RT differences that fall within this tolerance window are considered. Since MSPLIT-DIA uses RT information when it is available in the library, results obtained with the SWATHAtlas spectral library used RT information unless otherwise noted.      
+I was thinking of using stat1 for finding sweet spot and correcting for retention time. However, 
+I don't think it could work without knowing the RT-tolerance which was used in getting stat1. Also the change in retention time is consistent between these batches. We need to know the reason for it before imputing retention time. How come DDA libraries have such a high correlation? No RT-difference at all within same batch!     
+I think, for now, We decide not to impute retention time or just impute using the respective batch value.
+```{r}
+MSPLITfiltered[[1]][MSPLITfiltered[[1]]$Peptide_charge == "TGPNNSNTTFQK/2",c ("stat1", "stat2", "stat18", "stat19", "cosine")]
+MSPLITfiltered[[10]][MSPLITfiltered[[10]]$Peptide_charge == "TGPNNSNTTFQK/2",c ("stat1", "stat2", "stat18", "stat19", "cosine")]
+```
+
+Since correlation is so perfect, we can either use median or mean.
+```{r}
+write.table(RT.table, "RT.table.ori.csv", sep = ",", row.names = FALSE)
+for(i in indices){
+  naidex <- which(is.na(RT.table[i,2:13]))
+  RT.table[i,naidex] <- rowMeans(RT.table[i,2:13], na.rm = TRUE)
+}
+for(i in which(k >3)){
+  naidex <- which(is.na(RT.table[i,2:9]))
+  RT.table[i,naidex] <- rowMeans(RT.table[i,2:9], na.rm = TRUE)
+  naidex <- which(is.na(RT.table[i,10:13]))
+  RT.table[i,naidex] <- rowMeans(RT.table[i,10:13], na.rm = TRUE)
+}
+write.table(RT.table, "RT.table.imp.csv", sep = ",", row.names = FALSE)
 ```
 
 
