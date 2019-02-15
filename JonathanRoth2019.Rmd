@@ -42,53 +42,80 @@ suppressPackageStartupMessages({
 # Load Data
 ```{r loadData}
 setwd("~/RostLab/2019/Jon/Task208_Jon")
+temp <- list.files(pattern = "*SWATH_MSPLITfiltered.txt")
 F20180906_FL_Med24_N2a_FLAG_BR12 <- read.table("53538_29539_20180906_FL_Med24_N2a_FLAG_BR12_MID_SWATH_MSPLITfiltered.txt", header = TRUE, sep = "\t", comment.char = "")
 F20170623_Kdm1a_N2aSC15_FLAG_BR1 <- read.table("55215_26707_20170623_Kdm1a_N2aSC15_FLAG_BR1_SWATH_MSPLITfiltered.txt", header = TRUE, sep = "\t", comment.char = "")
 
 ```
 
+NA.idx.F20180906_FL_Med24_N2a_FLAG_BR12_DDA
+29303_20180624_FL_Chtop_N2ax2_FLAG_BR3_RE_1_SWATH.mzML
+29305_Date_FLAGTAG_ProteinName_CellLine(Mouse = N2a)_FlagPullDown_BioRep3_ReshotOnce_SWATH
+29307_20180624_FL_Chtop_138nt_N2ax2_FLAG_BR3_RE_1_SWATH.mzML
 
+The stat1 column is the SWATH RT value for the spectral match and the stat2 column is the RT value for the DDA library match, and that the final column is the FDR. 
+stat18 seems to be pvalues for the peaks identified by sectral match. Their retention time is in stat1 column. The stat19 seems to be FDR corrected qvalues from stat18 column. 
 ```{r}
 dim(F20180906_FL_Med24_N2a_FLAG_BR12)
+F20180906_FL_Med24_N2a_FLAG_BR12$stat18 <- as.numeric(strsplit(as.character(F20180906_FL_Med24_N2a_FLAG_BR12$stat18), split='fdr', fixed=TRUE)) #Loss of some precision because there are 19 digits after decimal in character format.
 F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge <- paste0(F20180906_FL_Med24_N2a_FLAG_BR12$Peptide,  "/", F20180906_FL_Med24_N2a_FLAG_BR12$z.1)
+F20180906_FL_Med24_N2a_FLAG_BR12 <- F20180906_FL_Med24_N2a_FLAG_BR12[, -c(1,9, 16, 19:33)]
+head(F20180906_FL_Med24_N2a_FLAG_BR12)
 
 length(unique(F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge)) # 8338
 length(unique(F20180906_FL_Med24_N2a_FLAG_BR12$stat2)) # 8251 #stat2 is retention time.
-df0 <- F20180906_FL_Med24_N2a_FLAG_BR12[!duplicated(F20180906_FL_Med24_N2a_FLAG_BR12[,c(18,36)]),] # Few peptides have multiple retention time values. Let's have a look at them
-rownames(df0) <- NULL
-length(df0$Peptide[duplicated(df0$Peptide)]) # 870
-df0[df0$Peptide == "TDQAQKAEGAGDAK",c(2:5,18,36)] # Something is wrong as their mz values are different. Does not make sense.
-dup.Pep <- df0$Peptide[duplicated(df0$Peptide)]
-sum(sapply(dup.Pep, function(peptide) length(unique(df0$Mz[df0$Peptide == peptide])) == 1)) # This is the case for all 870 peptides.
+F20180906_FL_Med24_N2a_FLAG_BR12_DDA <- F20180906_FL_Med24_N2a_FLAG_BR12[!duplicated(F20180906_FL_Med24_N2a_FLAG_BR12[,c(15,18)]), c(15,18)] # Few peptides have multiple retention time values. Let's have a look at them
+rownames(F20180906_FL_Med24_N2a_FLAG_BR12_DDA) <- NULL
 ```
 
 
 ```{r}
-# Remove all those duplicated pairs and move ahead.
-dup.Pep <- df0$Peptide[duplicated(df0$Peptide)]
-df1 <- df0[!(df0$Peptide %in% dup.Pep), ]
-dim(df1) # 6621
+F20170623_Kdm1a_N2aSC15_FLAG_BR1$Peptide_charge <- paste0(F20170623_Kdm1a_N2aSC15_FLAG_BR1$Peptide,  "/", F20170623_Kdm1a_N2aSC15_FLAG_BR1$z.1)
+F20170623_Kdm1a_N2aSC15_FLAG_BR1 <- F20170623_Kdm1a_N2aSC15_FLAG_BR1[, -c(1,9, 16, 19:33)]
 
-pf0 <- F20170623_Kdm1a_N2aSC15_FLAG_BR1[!duplicated(F20170623_Kdm1a_N2aSC15_FLAG_BR1[,c(5,18)]),]
-rownames(pf0) <- NULL
-pf1 <- pf0[!(pf0$Peptide %in% pf0$Peptide[duplicated(pf0$Peptide)]), ]
-dim(pf1) # 4026
+length(unique(F20170623_Kdm1a_N2aSC15_FLAG_BR1$Peptide_charge)) # 4802
+length(unique(F20170623_Kdm1a_N2aSC15_FLAG_BR1$stat2)) # 4771
+F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA <- F20170623_Kdm1a_N2aSC15_FLAG_BR1[!duplicated(F20170623_Kdm1a_N2aSC15_FLAG_BR1[,c(15,18)]),c(15,18)]
+rownames(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA) <- NULL
+nrow(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA) # 4802
 ```
 
 ```{r}
-cmnPep <- intersect(df1$Peptide, pf1$Peptide) #2329 peptides
-pepSet <- union(df1$Peptide, pf1$Peptide) # 8318 peptides
-RT.table <- merge(df1[,c(5,18)], pf1[,c(5,18)], by = "Peptide", all = TRUE)
-colnames(RT.table) <- c("Peptide", "df1", "pf1")
-cor(RT.table$df1, RT.table$pf1, use="complete.obs")
-plot(RT.table$df1, RT.table$pf1, pch = 16, cex = 0.5); abline(0,1, col = "red")
+cmnPep <- intersect(F20180906_FL_Med24_N2a_FLAG_BR12_DDA$Peptide_charge, F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA$Peptide_charge) #3129 peptides
+pepSet <- union(F20180906_FL_Med24_N2a_FLAG_BR12_DDA$Peptide_charge, F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA$Peptide_charge) #10011 peptides
+RT.table <- merge(F20180906_FL_Med24_N2a_FLAG_BR12_DDA[,c(2,1)], F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA[,c(2,1)], by = "Peptide_charge", all = TRUE) #10011 peptides
+colnames(RT.table) <- c("Peptide_charge", "F20180906_FL_Med24_N2a_FLAG_BR12_DDA", "F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA")
+cor(RT.table$F20180906_FL_Med24_N2a_FLAG_BR12, RT.table$F20180906_FL_Med24_N2a_FLAG_BR12_DDA, use="complete.obs")
+plot(RT.table$F20180906_FL_Med24_N2a_FLAG_BR12, RT.table$F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA, pch = 16, cex = 0.5); abline(0,1, col = "red")
 ```
 
+Above plot shows RTs from DDA libraries of two runs. It seems to be correlated pretty well which is a good thing. However, there are some points as outliers. stat1 is RT identified by spectral match. Let's check if we can use those values to identify correct RT for outliers.
 
 ```{r}
+RT.table$Peptide_charge[RT.table$F20170623_Kdm1a_N2aSC15_FLAG_BR1/RT.table$F20180906_FL_Med24_N2a_FLAG_BR12 > 1.1 & !is.na(RT.table$F20170623_Kdm1a_N2aSC15_FLAG_BR1/RT.table$F20180906_FL_Med24_N2a_FLAG_BR12)]
 
+F20180906_FL_Med24_N2a_FLAG_BR12[F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge == "KYEM+15.995FAQTLQQSR/2",c("stat1", "stat2", "stat18", "stat19")]
+F20170623_Kdm1a_N2aSC15_FLAG_BR1[F20170623_Kdm1a_N2aSC15_FLAG_BR1$Peptide_charge == "KYEM+15.995FAQTLQQSR/2",c("stat1", "stat2", "stat18", "stat19")]
+# For F20170623_Kdm1a_N2aSC15_FLAG_BR1 stat1 and stat2 values are very different. Need to know how stat1 is calculated. Does it uses stat2 and then find peaks within a window? or does it use all peaks from 2-hr run?
+# Without further information, we cannot use stat1.
+
+
+as.character(F20180906_FL_Med24_N2a_FLAG_BR12[F20180906_FL_Med24_N2a_FLAG_BR12$Peptide_charge == "KYEM+15.995FAQTLQQSR/2","stat19"])
+as.character(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA[F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA$Peptide_charge == "KYEM+15.995FAQTLQQSR/2","stat19"])
+as.character(F20180906_FL_Med24_N2a_FLAG_BR12_DDA[F20180906_FL_Med24_N2a_FLAG_BR12_DDA$Peptide_charge == "SYELQESNVR/2","stat18"])
+as.character(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA[F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA$Peptide_charge == "SYELQESNVR/2","stat18"])
+# This does not help. Need to discuss if we want to kee these points or just take the function to map RT values. 
 ```
+Do not use deaminated peptides. They should not be there as they are removed before as with mSPLIT they did not work.
 
+Correct for missing Values using LOESS function.
+```{r}
+NA.idx.F20180906_FL_Med24_N2a_FLAG_BR12_DDA <- is.na(RT.table$F20180906_FL_Med24_N2a_FLAG_BR12_DDA)
+NA.idx.F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA <- is.na(RT.table$F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA)
+Loess.fit <- loess(F20170623_Kdm1a_N2aSC15_FLAG_BR1_DDA~F20180906_FL_Med24_N2a_FLAG_BR12_DDA, data = RT.table, span = 0.1, na.action = na.exclude) # na.action = na.omit
+y <- predict(Loess.fit, newdata=RT.table$F20180906_FL_Med24_N2a_FLAG_BR12_DDA)
+plot(RT.table$F20180906_FL_Med24_N2a_FLAG_BR12_DDA, y, pch = 16, cex = 0.5); abline(0,1, col = "red", na.action = na.exclude)
+```
 
 
 # Session Info
